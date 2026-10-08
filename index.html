@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="session-token" content="__TOKEN__"><title>Aether · QRZ logboek</title><link rel="stylesheet" href="/style.css"></head>
+<body><main>
+<header><div><span class="eyebrow">FLEXRADIO / AETHERSDR</span><h1>Een call. Een verbinding.</h1><p>Je radio levert de gegevens. Jij legt het contact vast.</p></div><span id="connection" class="badge">TCI verbinden…</span></header>
+<nav class="viewTabs" aria-label="Weergave"><button id="logTab" type="button" aria-pressed="true">Logboek</button><button id="mapTab" type="button" aria-pressed="false">Kaart · afstand</button></nav>
+<div id="logPanel">
+<section class="radio" aria-label="Radiogegevens"><div><span class="label">FREQUENTIE · MHz</span><strong id="frequency">—</strong><small id="rx">Wachten op AetherSDR</small></div><div><span class="label">RADIO MODE</span><strong id="radioMode">—</strong><small id="drive">RF-instelling: —</small></div><div><span class="label">UTC</span><strong id="clock">—</strong><small id="date">—</small></div></section>
+<section class="card"><form id="qsoForm">
+<div class="row"><label class="grow">Call tegenstation<input id="call" placeholder="Bijvoorbeeld PA0ABC" maxlength="20" autocomplete="off" spellcheck="false" required autofocus></label><label>Ontvanger<select id="slice"><option value="auto">Volg TX-slice</option></select></label></div>
+<div class="lookupBar"><span id="lookupStatus" role="status">Stationsgegevens: stel je QRZ XML-login in bij Instellingen.</span><button id="lookupButton" type="button" class="textButton">QRZ opzoeken</button></div>
+<div class="stationActions"><button id="qrzPageButton" type="button" class="secondary" disabled>QRZ-pagina openen ↗</button><button id="logButton" type="button" disabled>Save in QRZ <span>↗</span></button></div>
+<p id="verificationHint" class="hint">Voer een call in. Controleer daarna naam, land en QTH voordat je opslaat.</p>
+<div id="profile" class="profile" hidden><span class="eyebrow">CONTROLEER HET TEGENSTATION</span><strong id="profileCall"></strong><dl class="verification"><dt>Naam</dt><dd id="profileName"></dd><dt>Land</dt><dd id="profileCountry"></dd><dt>QTH</dt><dd id="profileQth"></dd></dl><p id="profileLocation"></p><p id="profileQsl"></p><details><summary>Alle QRZ-stationsgegevens</summary><dl id="profileFields"></dl></details></div>
+<div class="row details"><label>Verzonden RST<input id="sent" value="59" maxlength="10"></label><label>Ontvangen RST<input id="received" value="59" maxlength="10"></label><label>Logmode<select id="mode"><option value="">Automatisch</option><option>SSB</option><option>CW</option><option>AM</option><option>FM</option><option>RTTY</option><option>FT8</option><option>FT4</option><option>PSK31</option><option>JS8</option><option>SSTV</option><option>DIGITALVOICE</option></select></label><label>Vermogen · W<input id="power" type="number" min="0" max="100000" step="any" placeholder="Optioneel"></label></div>
+<label class="check"><input id="autoSignal" type="checkbox" checked>S-waarde in Verzonden RST uit de S-meter</label>
+<p id="signalStatus" class="hint" aria-live="off">S-meter: wachten op meting. R en T beoordeel je zelf.</p>
+<p class="hint" id="modeHint">Frequentie en mode volgen de radio.</p>
+<label>Opmerking<input id="comment" maxlength="300" placeholder="Optioneel; gebruik gewone letters en cijfers"></label>
+<div class="timeRow"><span id="qsoTime">Starttijd wordt vastgelegd zodra je de call invoert.</span><button id="newQso" type="button" class="textButton">Nieuwe verbinding</button></div>
+</form><p id="message" role="status" aria-live="polite"></p></section>
+<details id="settings" class="card"><summary>Instellingen <span>Eigen call, QRZ en TCI</span></summary><form id="settingsForm">
+<div class="row"><label>Eigen roepnaam<input id="station" autocomplete="off" required maxlength="20"></label><label class="grow">TCI-adres<input id="tciUrl" value="ws://127.0.0.1:50001" required></label></div>
+<label>QRZ Logbook API-sleutel<input id="key" type="password" autocomplete="off" placeholder="Vul hier je sleutel in"></label>
+<label class="check"><input id="rememberKey" type="checkbox">Bewaar de sleutel lokaal op deze Mac</label>
+<h3>Stationsgegevens uit QRZ</h3>
+<p class="hint">Hiervoor gebruikt QRZ de XML-dienst. Vul je QRZ-login in; volledige gegevens vereisen XML-toegang in je abonnement.</p>
+<div class="row"><label>QRZ-gebruikersnaam<input id="xmlUser" autocomplete="off"></label><label>QRZ-wachtwoord<input id="xmlPassword" type="password" autocomplete="off" placeholder="Wachtwoord voor stationsgegevens"></label></div>
+<label class="check"><input id="rememberXml" type="checkbox">Bewaar ook het QRZ-wachtwoord lokaal op deze Mac</label>
+<div class="row"><label>Standaardvermogen · W<input id="defaultPower" type="number" min="0" step="any" placeholder="Optioneel"></label><p class="hint grow">TCI geeft de RF-instelling in procenten door. Vul hier het gebruikte vermogen in watt in, inclusief een eventuele versterker.</p></div>
+<button type="submit" class="secondary">Instellingen opslaan</button><span id="settingsMessage" role="status"></span>
+</form></details>
+<section class="history"><div class="historyTitle"><h2>Recente verbindingen</h2><button id="export" class="textButton">Download lokaal ADIF</button></div><div id="history"><p class="hint">Nog geen verbindingen gelogd.</p></div></section>
+</div>
+<section id="mapPanel" hidden><div class="card"><label>Verbinding op de kaart<select id="mapStation"><option value="current">Huidig tegenstation</option></select></label><div class="row mapHome"><label>Eigen QTH-locator<input id="homeGrid" placeholder="Automatisch uit QRZ" maxlength="8" autocomplete="off" spellcheck="false"></label><button id="mapRefresh" type="button" class="secondary">Kaart bijwerken</button></div><p id="mapStatus" role="status" class="hint">Open de kaart om de afstand te bekijken.</p><strong id="mapDistance"></strong><p id="mapLocations" class="hint"></p></div><div id="contactMap" aria-label="Kaart van de verbinding"></div><p class="hint mapNote">Afstand over het aardoppervlak. QRZ-locaties kunnen bij benadering zijn; een locator gebruikt het midden van het vak. De kaart toont de geregistreerde QTH.</p></section>
+<footer>Lokaal op je Mac · Gegevens gaan naar QRZ wanneer je op Log klikt.</footer>
+</main><script src="/tci.js"></script><script src="/app.js"></script></body></html>
