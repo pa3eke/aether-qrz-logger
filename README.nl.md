@@ -10,7 +10,9 @@ QRZ Logbook API. Geen extra Python-pakketten nodig; Python 3.10+ en een moderne 
 
 ![Aether QRZ Logger: stationscontrole en loggen naar QRZ](docs/images/logger-demo.jpg)
 
-*Screenshot met fictieve roepnamen en stationsgegevens.*
+![Kaart met verbindingslijn en afstand tussen demonstratiestations](docs/images/map-demo.jpg)
+
+*Screenshots met fictieve roepnamen en stationsgegevens.*
 
 ## Starten op je Mac
 

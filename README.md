@@ -8,7 +8,9 @@ First public version, tested with FlexRadio and AetherSDR on macOS. The interfac
 
 ![Aether QRZ Logger: station review, radio data and QRZ logging](docs/images/logger-demo.jpg)
 
-*Screenshot with fictional demonstration callsigns and station details.*
+![QTH map with a connection line and distance between demonstration stations](docs/images/map-demo.jpg)
+
+*Screenshots with fictional demonstration callsigns and station details.*
 
 ## Features
 
