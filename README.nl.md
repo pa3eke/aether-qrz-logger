@@ -8,6 +8,10 @@ Een kleine interface voor FlexRadio met AetherSDR. Je voert call en rapporten in
 de interface volgt frequentie en mode via TCI en verstuurt de verbinding met de
 QRZ Logbook API. Geen extra Python-pakketten nodig; Python 3.10+ en een moderne browser.
 
+![Aether QRZ Logger: stationscontrole en loggen naar QRZ](docs/images/logger-demo.jpg)
+
+*Screenshot met fictieve roepnamen en stationsgegevens.*
+
 ## Starten op je Mac
 
 1. Start AetherSDR, verbind je FlexRadio en zet de TCI-server aan. Standaardpoort: **50001**.

@@ -6,6 +6,10 @@ English · [Nederlandse handleiding](README.nl.md)
 
 First public version, tested with FlexRadio and AetherSDR on macOS. The interface is currently in Dutch. Other radios, TCI implementations and operating systems have not been extensively tested.
 
+![Aether QRZ Logger: station review, radio data and QRZ logging](docs/images/logger-demo.jpg)
+
+*Screenshot with fictional demonstration callsigns and station details.*
+
 ## Features
 
 - Frequency, mode and selected slice from AetherSDR via TCI, including split RX/TX frequency.

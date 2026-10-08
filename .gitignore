@@ -12,6 +12,8 @@ data/
 *.jpg
 *.jpeg
 *.png
+# Reviewed public demo screenshot
+!docs/images/logger-demo.jpg
 
 # Python and macOS files
 __pycache__/
