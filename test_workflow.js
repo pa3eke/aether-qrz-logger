@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
-const {randomUUID}=require('node:crypto');
+const {randomUUID,randomFillSync}=require('node:crypto');
 const {TciState,logMode,withSignal}=require('./tci.js');
 class Element {
   constructor() { this.value=''; this.checked=false; this.options=[]; this.childNodes=[]; this.listeners={}; this.classList={toggle(){}}; }
@@ -27,7 +27,7 @@ const popupWindow={open:()=> {
   return popup;
 }};
 class Socket { static OPEN=1; constructor(){this.readyState=1;} close(){} }
-const context=vm.createContext({console,TciState,logMode,withSignal,Date,crypto:{randomUUID},WebSocket:Socket,window:popupWindow,
+const context=vm.createContext({console,TciState,logMode,withSignal,Date,crypto:{randomUUID,getRandomValues:randomFillSync},WebSocket:Socket,window:popupWindow,location:{protocol:'http:',host:'127.0.0.1:8765'},
   document:{getElementById:id=>elements[id],querySelector:()=>({content:'test-token'}),createElement:()=>new Element()},
   Option:function(text,value){this.textContent=text;this.value=value;},setInterval(){},setTimeout(){},clearTimeout(){},
   fetch:async (path,options)=>{
@@ -41,6 +41,9 @@ const context=vm.createContext({console,TciState,logMode,withSignal,Date,crypto:
     return {ok:true,json:async()=>result};
   }});
 vm.runInContext(fs.readFileSync('app.js','utf8'),context);
+context.crypto.randomUUID=undefined;
+assert.match(vm.runInContext('qsoId()',context),/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,'HTTP on home Wi-Fi supports QSO IDs without secure-context randomUUID');
+context.crypto.randomUUID=randomUUID;
 // Coordinates must never fall back to (0,0) when a QRZ field is absent.
 assert.equal(vm.runInContext("profilePoint({lat:'',lon:''})",context),null);
 assert.equal(vm.runInContext("locatorPoint('ZZ99')",context),null);

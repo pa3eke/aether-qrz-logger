@@ -4,6 +4,11 @@ import argparse
 import datetime as dt
 import errno
 import json
+import ipaddress
+import socket
+import threading
+from http.cookies import SimpleCookie
+from tci_proxy import tunnel
 import math
 import os
 from pathlib import Path
@@ -14,7 +19,7 @@ import sys
 import time
 import unicodedata
 import xml.etree.ElementTree as ET
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlencode
 from urllib.request import Request, urlopen
 from urllib.error import URLError
@@ -135,7 +140,8 @@ class Logger:
         self.config['rememberXml'] = bool(self.config['xmlPassword'])
         self.xml_session = ''
         self.lookup_cache = {}
-        self.db = sqlite3.connect(self.dir/'log.sqlite3')
+        self.lock = threading.RLock()
+        self.db = sqlite3.connect(self.dir/'log.sqlite3', check_same_thread=False)
         self.db.execute('CREATE TABLE IF NOT EXISTS qsos (id TEXT PRIMARY KEY, record TEXT, adif TEXT, status TEXT, detail TEXT)')
         self.db.commit()
         os.chmod(self.dir/'log.sqlite3',0o600)
@@ -286,13 +292,27 @@ class Logger:
         return header + '\n'.join(a.replace('<EOR>',adif_field('APP_AETHERQRZ_STATUS',s)+'<EOR>')
                                    for a,s in self.db.execute('SELECT adif,status FROM qsos ORDER BY rowid')) + '\n'
 
-def handler_for(logger, token):
+def handler_for(logger, token, lan_ip=None, access_code=None):
+    allowed_hosts = {'127.0.0.1'} | ({lan_ip} if lan_ip else set())
+    attempts = {}
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass  # Do not write submitted fields or secrets to access logs.
 
         def valid_host(self):
-            return self.headers.get('Host') == f'127.0.0.1:{self.server.server_port}'
+            return self.headers.get('Host') in {f'{host}:{self.server.server_port}' for host in allowed_hosts}
+
+        def authorized(self):
+            if ipaddress.ip_address(self.client_address[0]).is_loopback:
+                return True
+            try:
+                cookie = SimpleCookie(self.headers.get('Cookie', ''))
+                return secrets.compare_digest(cookie['aether-session'].value, token)
+            except (KeyError, ValueError):
+                return False
+
+        def login_page(self, error=''):
+            return self.reply(200, '''<!doctype html><html lang="nl"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Aether QRZ · wifi</title><body style="font:16px -apple-system,sans-serif;background:#10171d;color:#e9edf1;padding:24px;max-width:440px;margin:auto"><h1>Aether QRZ Logger</h1><p>Vul de wifi-toegangscode in die op je Mac in het startvenster staat.</p><form method="post" action="/pair"><label>Toegangscode <input name="code" autocomplete="off" required style="font-size:20px;width:100%;box-sizing:border-box;padding:10px"></label><button style="margin-top:12px;padding:12px">Open logboek</button></form><p>''' + error + '</p></body></html>', 'text/html')
 
         def reply(self, code, body, mime='application/json'):
             if isinstance(body,(dict,list)):
@@ -310,6 +330,14 @@ def handler_for(logger, token):
         def do_GET(self):
             if not self.valid_host():
                 return self.reply(403,{'error':'Ongeldige host.'})
+            if not self.authorized():
+                return self.login_page() if self.path=='/' else self.reply(401,{'error':'Vul eerst de wifi-toegangscode in.'})
+            if self.path=='/tci':
+                if self.headers.get('Origin') != 'http://' + self.headers.get('Host','') or self.headers.get('Upgrade','').lower() != 'websocket':
+                    return self.reply(403,{'error':'Ongeldige TCI-aanvraag.'})
+                with logger.lock:
+                    address = logger.config['tciUrl']
+                return tunnel(self,address)
             if self.path=='/':
                 return self.reply(200,(ROOT/'index.html').read_text().replace('__TOKEN__',token),'text/html')
             if self.path in ('/app.js','/tci.js','/style.css'):
@@ -318,23 +346,48 @@ def handler_for(logger, token):
             if self.path in ('/api/config','/api/history','/api/export'):
                 if not secrets.compare_digest(self.headers.get('X-Token',''),token):
                     return self.reply(403,{'error':'Ongeldige sessie.'})
-                if self.path=='/api/config': return self.reply(200,logger.public_config())
-                if self.path=='/api/history': return self.reply(200,logger.history())
-                return self.reply(200,logger.export(),'text/plain')
+                with logger.lock:
+                    if self.path=='/api/config': return self.reply(200,logger.public_config())
+                    if self.path=='/api/history': return self.reply(200,logger.history())
+                    return self.reply(200,logger.export(),'text/plain')
             self.reply(404,{'error':'Niet gevonden.'})
 
         def do_POST(self):
-            origin = f'http://127.0.0.1:{self.server.server_port}'
-            if not self.valid_host() or self.headers.get('Origin') != origin or not secrets.compare_digest(self.headers.get('X-Token',''),token):
+            origin = 'http://' + self.headers.get('Host','')
+            if not self.valid_host() or self.headers.get('Origin') != origin:
+                return self.reply(403,{'error':'Ongeldige sessie.'})
+            if self.path=='/pair':
+                now = time.monotonic()
+                client = self.client_address[0]
+                recent = [t for t in attempts.get(client,[]) if now-t<60]
+                attempts[client] = recent
+                if len(recent)>=5:
+                    return self.reply(429,{'error':'Wacht een minuut en probeer opnieuw.'})
+                recent.append(now)
+                length = int(self.headers.get('Content-Length','0'))
+                if not 0<length<=128:
+                    return self.reply(400,{'error':'Ongeldige toegangscode.'})
+                code = parse_qs(self.rfile.read(length).decode('utf-8',errors='replace')).get('code',[''])[0].strip().upper()
+                if not access_code or not secrets.compare_digest(code,access_code):
+                    return self.login_page('Onjuiste toegangscode.')
+                self.send_response(303)
+                self.send_header('Location','/')
+                self.send_header('Set-Cookie',f'aether-session={token}; HttpOnly; SameSite=Strict; Path=/')
+                self.send_header('Cache-Control','no-store')
+                self.send_header('Content-Length','0')
+                self.end_headers()
+                return
+            if not self.authorized() or not secrets.compare_digest(self.headers.get('X-Token',''),token):
                 return self.reply(403,{'error':'Ongeldige sessie.'})
             try:
                 length = int(self.headers.get('Content-Length','0'))
                 if not 0 < length <= 8192: raise ValueError('Ongeldige aanvraag.')
                 values = json.loads(self.rfile.read(length))
-                if self.path=='/api/config': result = logger.configure(values)
-                elif self.path=='/api/lookup': result = logger.lookup(values.get('call',''))
-                elif self.path=='/api/log': result = logger.upload(values)
-                else: return self.reply(404,{'error':'Niet gevonden.'})
+                with logger.lock:
+                    if self.path=='/api/config': result = logger.configure(values)
+                    elif self.path=='/api/lookup': result = logger.lookup(values.get('call',''))
+                    elif self.path=='/api/log': result = logger.upload(values)
+                    else: return self.reply(404,{'error':'Niet gevonden.'})
                 self.reply(200,result)
             except LookupError as error:
                 self.reply(400,{'error':str(error)})
@@ -354,14 +407,31 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--port',type=int,default=8765)
     parser.add_argument('--no-browser',action='store_true')
+    parser.add_argument('--lan',nargs='?',const='auto',help='Wifi-toegang, optioneel met lokaal IPv4-adres')
     args = parser.parse_args()
     if not 1 <= args.port <= 65535:
         parser.error('Poort moet tussen 1 en 65535 liggen.')
+    lan_ip = args.lan
+    if lan_ip == 'auto':
+        try:
+            with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as probe:
+                probe.connect(('192.0.2.1',9))
+                lan_ip = probe.getsockname()[0]
+        except OSError:
+            parser.error('Wifi-adres niet gevonden. Gebruik --lan gevolgd door het IP-adres van je Mac.')
+    if lan_ip:
+        try:
+            ip = ipaddress.IPv4Address(lan_ip)
+            if not any(ip in ipaddress.ip_network(net) for net in ('10.0.0.0/8','172.16.0.0/12','192.168.0.0/16')):
+                raise ValueError()
+        except ValueError:
+            parser.error('Gebruik een privé IPv4-adres van je eigen netwerk.')
+    access_code = secrets.token_hex(4).upper() if lan_ip else None
     os.umask(0o077)
     logger = Logger(ROOT/'data')
     url = f'http://127.0.0.1:{args.port}'
     try:
-        server = HTTPServer(('127.0.0.1',args.port),handler_for(logger,secrets.token_urlsafe(32)))
+        server = ThreadingHTTPServer(('0.0.0.0' if lan_ip else '127.0.0.1',args.port),handler_for(logger,secrets.token_urlsafe(32),lan_ip,access_code))
     except OSError as error:
         logger.db.close()
         if error.errno == errno.EADDRINUSE:
@@ -377,6 +447,8 @@ def main():
         return 1
     url = f'http://127.0.0.1:{server.server_port}'
     print(f'Aether QRZ draait op {url}\nStoppen: Ctrl+C',flush=True)
+    if lan_ip:
+        print(f'Wifi: http://{lan_ip}:{args.port}\nWifi-toegangscode: {access_code}',flush=True)
     if not args.no_browser:
         import webbrowser
         webbrowser.open(url)

@@ -1,5 +1,7 @@
 # Aether QRZ Logger
 
+Version **0.1.0** · [Download the latest release](https://github.com/pa3eke/aether-qrz-logger/releases/latest)
+
 A small, local browser interface for logging FlexRadio / AetherSDR contacts directly to QRZ Logbook on macOS. Enter a callsign, review the station details, then click **Save in QRZ**.
 
 English · [Nederlandse handleiding](README.nl.md)
@@ -104,3 +106,9 @@ Please include macOS, Python, browser and AetherSDR versions when reporting issu
 ## License
 
 [MIT](LICENSE). Independent project; not affiliated with or endorsed by FlexRadio, AetherSDR or QRZ. Third-party libraries and map data retain their own licenses and attribution requirements.
+
+## iPhone / iPad on your home Wi-Fi
+
+Start **Start logboek wifi.command** instead of the usual launcher (stop the existing server first with Ctrl+C). Alternatively run `python3 server.py --lan`. The Terminal window displays the local Wi-Fi URL and a new access code. Open that URL in Safari on the same network and enter the code. Use Share → Add to Home Screen if desired. Keep the Mac and AetherSDR running.
+
+The Mac forwards TCI to mobile browsers; keep the TCI setting pointing at AetherSDR on the Mac. QRZ keys stay on the server. Wi-Fi mode uses HTTP with an access-code session cookie; it is intended for a trusted home network, without internet port forwarding. The normal launcher remains restricted to the Mac itself. Restarting the server changes the access code and invalidates mobile sessions.

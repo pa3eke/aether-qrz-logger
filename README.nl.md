@@ -1,5 +1,7 @@
 # Aether QRZ Logger
 
+Versie **0.1.0** · [Download de nieuwste release](https://github.com/pa3eke/aether-qrz-logger/releases/latest)
+
 [English](README.md) · Nederlands
 
 Eerste publieke versie. Getest met FlexRadio en AetherSDR op macOS; andere configuraties zijn nog niet uitgebreid getest.
@@ -153,3 +155,9 @@ Roepnamen bij **Recente verbindingen** zijn klikbaar en openen de openbare QRZ-p
 ## Licentie
 
 MIT, zie [LICENSE](LICENSE). Dit is een onafhankelijk project, zonder officiële verbinding met FlexRadio, AetherSDR of QRZ. De gebruikersinterface is Nederlandstalig.
+
+## iPhone / iPad via je eigen wifi
+
+Stop een bestaand startvenster eerst met Ctrl+C. Start daarna **Start logboek wifi.command**, of gebruik `python3 server.py --lan`. Het startvenster toont het wifi-adres en een toegangscode. Open het adres in Safari op je iPhone/iPad op hetzelfde netwerk en vul de code in. Via Delen → Zet op beginscherm kun je een snelkoppeling maken. Laat de Mac en AetherSDR aanstaan.
+
+De Mac geeft TCI door aan de mobiele browser: het TCI-adres blijft naar AetherSDR op de Mac wijzen. Wifi-toegang gebruikt HTTP met een toegangscode en sessiecookie, bedoeld voor je vertrouwde thuisnetwerk. Stel hiervoor geen port forwarding naar internet in. De gewone starter blijft alleen op de Mac bereikbaar. Een herstart geeft een nieuwe toegangscode; mobiele apparaten moeten dan opnieuw aanmelden.

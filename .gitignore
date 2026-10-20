@@ -22,3 +22,7 @@ __pycache__/
 .venv/
 .pytest_cache/
 .DS_Store
+
+# Public application icon and local release archives
+!assets/aether-qrz-icon.png
+dist/

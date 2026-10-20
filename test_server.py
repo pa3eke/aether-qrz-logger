@@ -1,4 +1,7 @@
 import copy
+import io
+from email.message import Message
+from types import SimpleNamespace
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -24,6 +27,62 @@ class LogTests(unittest.TestCase):
 
     def tearDown(self):
         self.log.db.close(); self.temp.cleanup()
+
+    def request_handler(self, path='/', origin=None, cookie=None, code=None, host='192.168.1.87:8765'):
+        Handler=server.handler_for(self.log,'session-test-token','192.168.1.87','A1B2C3D4')
+        handler=Handler.__new__(Handler)
+        handler.headers=Message()
+        handler.headers['Host']=host
+        if origin: handler.headers['Origin']=origin
+        if cookie: handler.headers['Cookie']=cookie
+        handler.server=SimpleNamespace(server_port=8765)
+        handler.client_address=('192.168.1.20',50000)
+        handler.path=path
+        handler.response=None
+        handler.response_headers={}
+        handler.reply=lambda status,body,mime='application/json': setattr(handler,'response',(status,body))
+        handler.send_response=lambda status: setattr(handler,'response',(status,''))
+        handler.send_header=lambda name,value: handler.response_headers.update({name:value})
+        handler.end_headers=lambda: None
+        body=('code='+code).encode() if code else b'{}'
+        handler.headers['Content-Length']=str(len(body))
+        handler.rfile=io.BytesIO(body)
+        return handler
+
+    def test_wifi_requires_pairing_and_rejects_bad_host(self):
+        h=self.request_handler('/api/config')
+        h.do_GET(); self.assertEqual(h.response[0],401)
+        h=self.request_handler('/',host='attacker.example:8765')
+        h.do_GET(); self.assertEqual(h.response[0],403)
+        h=self.request_handler('/')
+        h.do_GET(); self.assertIn('wifi-toegangscode',h.response[1])
+        self.assertNotIn('session-test-token',h.response[1])
+
+    def test_pairing_cookie_and_same_origin(self):
+        h=self.request_handler('/pair',origin='http://192.168.1.87:8765',code='A1B2C3D4')
+        h.do_POST(); self.assertEqual(h.response[0],303)
+        cookie=h.response_headers['Set-Cookie']
+        self.assertIn('HttpOnly',cookie); self.assertIn('SameSite=Strict',cookie)
+        h=self.request_handler('/api/config',cookie=cookie)
+        h.headers['X-Token']='session-test-token'
+        h.do_GET(); self.assertEqual(h.response[0],200)
+        self.assertNotIn('key',h.response[1])
+        h=self.request_handler('/pair',origin='http://attacker.example',code='A1B2C3D4')
+        h.do_POST(); self.assertEqual(h.response[0],403)
+        h=self.request_handler('/pair',origin='http://192.168.1.87:8765',code='BADCODE')
+        h.do_POST(); self.assertNotIn('Set-Cookie',h.response_headers)
+
+    @patch('server.tunnel')
+    def test_tci_proxy_requires_cookie_and_same_origin(self, proxy):
+        h=self.request_handler('/tci',origin='http://192.168.1.87:8765')
+        h.headers['Upgrade']='websocket'
+        h.do_GET(); proxy.assert_not_called()
+        h=self.request_handler('/tci',origin='http://evil.example',cookie='aether-session=session-test-token')
+        h.headers['Upgrade']='websocket'
+        h.do_GET(); self.assertEqual(h.response[0],403); proxy.assert_not_called()
+        h=self.request_handler('/tci',origin='http://192.168.1.87:8765',cookie='aether-session=session-test-token')
+        h.headers['Upgrade']='websocket'
+        h.do_GET(); proxy.assert_called_once_with(h,self.log.config['tciUrl'])
 
     def test_utc_frequency_power_and_split(self):
         r=copy.copy(RECORD); r['rxFrequency']=14.290

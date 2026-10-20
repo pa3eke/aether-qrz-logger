@@ -112,6 +112,13 @@ async function api(path, data) {
   if (!response.ok) throw new Error(result.error || 'De lokale interface antwoordt niet.');
   return result;
 }
+function qsoId() {
+  if(crypto.randomUUID) return crypto.randomUUID();
+  const bytes=crypto.getRandomValues(new Uint8Array(16));
+  bytes[6]=(bytes[6]&15)|64; bytes[8]=(bytes[8]&63)|128;
+  const hex=Array.from(bytes,n=>n.toString(16).padStart(2,'0')).join('');
+  return hex.slice(0,8)+'-'+hex.slice(8,12)+'-'+hex.slice(12,16)+'-'+hex.slice(16,20)+'-'+hex.slice(20);
+}
 function message(text, error=false) { $('message').textContent = text; $('message').classList.toggle('error', error); }
 function current() { return radio.selected($('slice').value); }
 function validRadio() { return socket?.readyState === WebSocket.OPEN && current(); }
@@ -157,7 +164,7 @@ function connect() {
   clearTimeout(reconnect);
   if (socket) { socket.onclose = null; socket.close(); }
   radio.reset(); renderRadio();
-  try { socket = new WebSocket(config.tciUrl); }
+  try { socket = new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/tci'); }
   catch { message('Ongeldig TCI-adres. Controleer de instellingen.',true); return; }
   const ws = socket;
   ws.onopen = renderRadio;
@@ -197,7 +204,7 @@ $('logButton').addEventListener('click', async () => {
     message('Er is geen recente S-metermeting. Wacht op het tegenstation of schakel automatisch S uit en vul het rapport zelf in.',true); return;
   }
   if ($('autoSignal').checked && s.signal && ['SSB','CW','AM','FM'].includes(mode)) $('sent').value=withSignal($('sent').value,mode,s.signal.strength);
-  pendingRecord = {id:crypto.randomUUID(), call:$('call').value.trim(), frequency:s.frequency/1e6,
+  pendingRecord = {id:qsoId(), call:$('call').value.trim(), frequency:s.frequency/1e6,
     rxFrequency:s.rx/1e6, mode, time:(qsoStart || new Date()).toISOString(),
     sent:$('sent').value, received:$('received').value, power:$('power').value, comment:$('comment').value};
   if ($('autoSignal').checked && s.signal && ['SSB','CW','AM','FM'].includes(mode)) pendingRecord.signal = s.signal;
