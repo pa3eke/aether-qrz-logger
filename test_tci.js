@@ -43,4 +43,23 @@ assert.equal(meter.selected().signal,null);
 meter.ingest('rx_smeter:0,-79;vfo:0,0,7074000;');
 assert.equal(meter.selected().signal,null); // Tuning invalidates the old measurement.
 Date.now=realNow;
+// Regression: replay deskHPSDR's reported TX VFO, not idle channel 1.
+for (const [name,receiver,tx,expected] of [
+  ['normal A','0','0',7118200], ['normal B','1','1',14288400],
+  ['split TX A','1','0',7118200], ['split TX B','0','1',14288400]
+]) {
+  const radio=new TciState();
+  radio.ingest('device:SunSDR2QRP;vfo:0,0,7118200;vfo:0,1,14288400;modulation:0,lsb;'+
+    (receiver==='1'?'vfo:1,0,14288400;modulation:1,usb;':'modulation:1,usb;')+
+    'tx_enable:0,true;split_enable:0,'+(tx==='1'?'true':'false')+';tx_frequency:'+expected+';start;ready;');
+  assert.equal(radio.selected().frequency,expected,name);
+  assert.equal(radio.selected().id,tx,name+' TX VFO');
+  assert.equal(radio.selected('a').frequency,7118200);
+  assert.equal(radio.selected('b').frequency,14288400);
+  radio.ingest('tx_frequency:12345678;');
+  assert.equal(radio.selected(),null,name+' mismatched reports block logging');
+  radio.reset();
+  assert.equal(radio.txFrequency,null);
+  assert.equal(radio.txVfo,null);
+}
 console.log('TCI: split, TX-slice, modes, fragments, invalid data and radio disconnect passed.');

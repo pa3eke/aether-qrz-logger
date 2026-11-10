@@ -1,6 +1,6 @@
 # Aether QRZ Logger
 
-Version **0.1.0** · [Download the latest release](https://github.com/pa3eke/aether-qrz-logger/releases/latest)
+Version **0.1.1** · [Download the latest release](https://github.com/pa3eke/aether-qrz-logger/releases/latest)
 
 A small, local browser interface for logging FlexRadio / AetherSDR contacts directly to QRZ Logbook on macOS. Enter a callsign, review the station details, then click **Save in QRZ**.
 

@@ -54,6 +54,29 @@ assert.equal(vm.runInContext('distanceKm([52,5],[52,5])',context),0);
 assert.ok(vm.runInContext('connectionArc([10,179],[10,-179]).every((p,i,a)=>!i || Math.abs(p[1]-a[i-1][1])<180)',context),'Date-line route stays continuous');
 (async()=>{
   await new Promise(resolve=>setImmediate(resolve));
+  // Exercise the actual Save handler with simulated QRZ: no real uploads.
+  elements.autoSignal.checked=false;
+  for(const [name,receiver,tx,expected] of [
+    ['normal A','0','0',7.1182],['normal B','1','1',14.2884],
+    ['split TX A','1','0',7.1182],['split TX B','0','1',14.2884]
+  ]) {
+    vm.runInContext('radio.reset()',context);
+    const commands='device:SunSDR2QRP;vfo:0,0,7118200;vfo:0,1,14288400;modulation:0,lsb;'+
+      (receiver==='1'?'vfo:1,0,14288400;modulation:1,usb;':'modulation:1,usb;')+
+      'tx_enable:0,true;split_enable:0,'+(tx==='1'?'true':'false')+';tx_frequency:'+Math.round(expected*1e6)+';start;ready;';
+    vm.runInContext('radio.ingest('+JSON.stringify(commands)+')',context);
+    elements.slice.value='auto';
+    elements.call.value='PA0ABC'; elements.call.listeners.input();
+    await vm.runInContext('lookup()',context);
+    assert.equal(elements.logButton.disabled,false,name+' may save after verification');
+    assert.equal(elements.frequency.textContent,expected.toFixed(6),name+' displayed TX');
+    await elements.logButton.listeners.click();
+    assert.equal(uploads.at(-1).frequency,expected,name+' QRZ payload');
+  }
+  uploads.length=0;
+  vm.runInContext('radio.reset()',context);
+  elements.autoSignal.checked=true;
+
   vm.runInContext("radio.ingest('vfo:0,0,14292000;modulation:0,usb;tx_enable:0,true;start;ready;rx_smeter:0,-73;');",context);
   elements.call.value='PA0ABC'; elements.call.listeners.input();
   assert.equal(elements.logButton.disabled,true,'Cannot save before lookup');

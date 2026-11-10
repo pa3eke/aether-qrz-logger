@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.1 — 2026-11-10
+
+- Fix deskHPSDR TX-VFO logging: read the explicit TX frequency and reported TX VFO instead of treating idle channel 1 / VFO B as the transmit frequency.
+- Restore the working VFO A / VFO B / Follow TX selection behavior from the local version.
+- Block saving during inconsistent TX/VFO reports rather than using a stale transmit frequency.
+- Add regression tests for normal and split operation with TX on A and B, including simulated QRZ upload payloads.
+- Preserve the existing map and other logging functionality.
+
+
 ## 0.1.0 — 2026-10-20
 
 First packaged release of Aether QRZ Logger for macOS. The application interface is in Dutch.

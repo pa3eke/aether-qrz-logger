@@ -1,6 +1,6 @@
 # Aether QRZ Logger
 
-Versie **0.1.0** · [Download de nieuwste release](https://github.com/pa3eke/aether-qrz-logger/releases/latest)
+Versie **0.1.1** · [Download de nieuwste release](https://github.com/pa3eke/aether-qrz-logger/releases/latest)
 
 [English](README.md) · Nederlands
 

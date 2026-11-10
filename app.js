@@ -125,20 +125,24 @@ function validRadio() { return socket?.readyState === WebSocket.OPEN && current(
 function renderRadio() {
   renderQrzButton();
   const previous = $('slice').value;
-  const wanted = Object.keys(radio.slices).sort((a,b)=>Number(a)-Number(b));
-  const existing = Array.from($('slice').options).slice(1).map(o=>o.value);
-  if (wanted.join() !== existing.join()) {
-    $('slice').replaceChildren(new Option('Volg TX-slice', 'auto'), ...wanted.map(id=>new Option('Slice '+id,id)));
-    // Keep a removed selected slice unavailable instead of silently logging another.
-    if (previous !== 'auto' && !wanted.includes(previous)) $('slice').add(new Option('Slice '+previous+' (niet beschikbaar)', previous));
-    $('slice').value = previous;
+  const choices = radio.choices();
+  const autoLabel = radio.vfoLayout ? 'Volg TX-VFO' : 'Volg TX-slice';
+  if (previous && previous !== 'auto' && !choices.some(([id])=>id===previous)) {
+    const label = previous === 'a' ? 'VFO A' : previous === 'b' ? 'VFO B' : 'Slice '+previous;
+    choices.push([previous,label+' (niet beschikbaar)']);
+  }
+  const options = [['auto',autoLabel],...choices];
+  const existing = Array.from($('slice').options);
+  if (options.length !== existing.length || options.some(([id,label],i)=>existing[i].value !== id || existing[i].textContent !== label)) {
+    $('slice').replaceChildren(...options.map(([id,label])=>new Option(label,id)));
+    $('slice').value = previous || 'auto';
   }
   const s = validRadio();
   $('connection').textContent = s ? '● TCI verbonden' : socket?.readyState === WebSocket.OPEN ? 'Wachten op radio' : 'TCI niet verbonden';
   $('connection').classList.toggle('connected', !!s);
   $('frequency').textContent = s ? (s.frequency/1e6).toFixed(6) : '—';
   $('radioMode').textContent = s?.mode || '—';
-  $('rx').textContent = s ? 'Slice '+s.id+(s.rx!==s.frequency ? ' · RX '+(s.rx/1e6).toFixed(6)+' MHz' : ' · TX-frequentie') : 'Start AetherSDR en schakel TCI in';
+  $('rx').textContent = s ? s.label+(s.rx!==s.frequency ? ' · RX '+(s.rx/1e6).toFixed(6)+' MHz' : $('slice').value==='auto' ? ' · TX-frequentie' : ' · Gekozen frequentie') : 'Wachten op TCI-frequentie';
   $('drive').textContent = s?.drive != null ? 'RF-instelling: '+s.drive+'%' : 'RF-instelling: —';
   const mapped = s ? logMode(s.mode) : '';
   const mode = $('mode').value || mapped;
@@ -148,7 +152,7 @@ function renderRadio() {
   if ($('autoSignal').checked && !analog) $('signalStatus').textContent += ' Voor deze mode blijft het rapport handmatig.';
   if ($('autoSignal').checked && analog && signal && !busy && !pendingRecord) $('sent').value = withSignal($('sent').value,mode,signal.strength);
   $('mode').options[0].textContent = mapped ? 'Automatisch · '+mapped : 'Kies logmode';
-  $('modeHint').textContent = s && !mapped ? 'Bij DIGU/DIGL kies je zelf FT8, FT4 of de gebruikte digitale mode.' : 'Frequentie en mode volgen de radio. Vermogen in watt vul je zelf in.';
+  $('modeHint').textContent = s && !s.mode ? 'De radio meldt geen mode voor deze VFO. Kies de logmode zelf.' : s && !mapped ? 'Bij DIGU/DIGL kies je zelf FT8, FT4 of de gebruikte digitale mode.' : 'Frequentie en mode volgen de radio. Vermogen in watt vul je zelf in.';
   const verified = stationVerified();
   $('logButton').disabled = busy || lookupBusy || !verified || !!pendingRecord || !config?.hasKey || !s || !($('mode').value || mapped) || !$('call').value.trim();
   $('verificationHint').textContent = lookupBusy ? 'Even wachten: de stationsgegevens worden opgezocht.' :
@@ -199,7 +203,7 @@ $('logButton').addEventListener('click', async () => {
   if (busy || lookupBusy || !stationVerified() || !s || !config.hasKey) return;
   if (pendingRecord) { message('Deze verbinding is al aangeboden. Controleer de status hieronder; kies daarna Nieuwe verbinding.',true); return; }
   const mode = $('mode').value || logMode(s.mode);
-  if (!mode) { message('Kies de gebruikte digitale mode.',true); return; }
+  if (!mode) { message('Kies de gebruikte mode.',true); return; }
   if ($('autoSignal').checked && ['SSB','CW','AM','FM'].includes(mode) && !s.signal) {
     message('Er is geen recente S-metermeting. Wacht op het tegenstation of schakel automatisch S uit en vul het rapport zelf in.',true); return;
   }
