@@ -338,6 +338,7 @@ function loadMapLibrary() {
 async function refreshContactMap() {
   const version=++mapVersion;
   $('mapDistance').textContent=''; $('mapLocations').textContent='';
+  $('streetView').hidden=true; $('streetView').removeAttribute('href');
   if(contactLayers) contactLayers.clearLayers();
   $('mapStatus').textContent='Locaties en kaart ophalen…';
   try {
@@ -376,6 +377,8 @@ async function refreshContactMap() {
       contactMap.setView(home,6);
       throw new Error(call?'Geen coördinaten of locator voor '+call+'. Zoek de stationsgegevens op in het logboek.':'Voer een call in het logboek in of kies een recente verbinding.');
     }
+    $('streetView').href='https://www.google.com/maps/@?api=1&map_action=pano&viewpoint='+remote.join(',');
+    $('streetView').hidden=false;
     const arc=connectionArc(home,remote);
     L.polyline(arc,{color:'#2179b5',weight:3}).addTo(contactLayers);
     const endpoint=arc[arc.length-1];

@@ -10,6 +10,7 @@ class Element {
   replaceChildren(...nodes) { this.childNodes=nodes; this.options=nodes; }
   append(...nodes) { this.childNodes.push(...nodes); }
   add(node) { this.options.push(node); }
+  removeAttribute(key) { delete this[key]; }
   focus() {}
   setAttribute(key,value) { this[key]=value; }
 }
@@ -95,5 +96,23 @@ assert.ok(vm.runInContext('connectionArc([10,179],[10,-179]).every((p,i,a)=>!i |
   assert.match(elements.qrzPageButton.textContent,/openen/,'Manual close resets button');
   blocked=true; elements.qrzPageButton.listeners.click();
   assert.match(elements.message.textContent,/blokkeert/,'Popup blocking is explained');
+  // Exercise the actual map refresh with both current and saved station data.
+  const layer={addTo(){return this;},bindTooltip(){return this;},on(){return this;},clearLayers(){}};
+  context.window.L={map:()=>({setView(){return this;},invalidateSize(){},fitBounds(){}}),tileLayer:()=>layer,layerGroup:()=>layer,circleMarker:()=>layer,polyline:()=>layer,latLngBounds:()=>({})};
+  elements.mapPanel.hidden=false; elements.homeGrid.value='JO22'; elements.mapStation.value='current';
+  elements.call.value='PA0ABC';
+  vm.runInContext("profile={query:'PA0ABC',fields:{lat:'0',lon:'-179.5'}}",context);
+  await vm.runInContext('refreshContactMap()',context);
+  assert.equal(elements.streetView.hidden,false);
+  assert.equal(elements.streetView.href,'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=0,-179.5');
+  vm.runInContext("mapRecords=[{id:'saved',call:'K1ABC',profile:{fields:{grid:'JO22'}}}]",context);
+  elements.mapStation.value='saved'; await vm.runInContext('refreshContactMap()',context);
+  assert.match(elements.streetView.href,/viewpoint=52.5,5$/,'Saved station uses locator center');
+  elements.mapStation.value='current'; elements.call.value='OTHER'; await vm.runInContext('refreshContactMap()',context);
+  assert.equal(elements.streetView.hidden,true,'A stale lookup cannot open the previous station');
+  assert.equal(elements.streetView.href,undefined);
+  vm.runInContext("profile={query:'OTHER',fields:{lat:'91',lon:'0'}}",context);
+  await vm.runInContext('refreshContactMap()',context);
+  assert.equal(elements.streetView.hidden,true,'Invalid coordinates do not produce a link');
   console.log('Workflow passed: name/country/QTH preview, Enter only looks up, explicit Save, and call change resets verification.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
